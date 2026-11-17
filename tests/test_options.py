@@ -1180,6 +1180,19 @@ def test_missing_envvar(runner):
     assert "Error: Missing option '--foo'." in result.output
 
 
+@pytest.mark.parametrize("args", [[], ["--port", "invalid"]])
+def test_error_hint_auto_envvar_prefix(runner, args):
+    cli = click.Command(
+        "cli",
+        params=[click.Option(["--port"], type=int, required=True, show_envvar=True)],
+    )
+
+    result = runner.invoke(cli, args, auto_envvar_prefix="TEST")
+
+    assert result.exit_code == 2
+    assert "(env var: 'TEST_PORT')" in result.output
+
+
 @pytest.mark.parametrize(
     ("envvar", "expected"),
     [

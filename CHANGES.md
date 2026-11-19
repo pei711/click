@@ -2,6 +2,8 @@
 
 Unreleased
 
+- Do not eagerly open a lazy file when it refers to a FIFO, which can consume
+  data before it is read. {issue}`2645`
 - Drop support for Python 3.10. {pr}`3920` {pr}`3921`
 - A parameter name that is not a valid Python identifier, or that is a Python
   keyword, is deprecated and raises `TypeError` in Click 9.0. {pr}`3866`

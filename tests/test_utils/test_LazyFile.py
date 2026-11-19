@@ -1,3 +1,7 @@
+import os
+
+import pytest
+
 import click
 
 
@@ -9,3 +13,12 @@ def test_iter_lazyfile(tmpdir):
         with click.utils._LazyFile(f.name) as lf:
             for e_line, a_line in zip(expected, lf, strict=False):
                 assert e_line == a_line.strip()
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="Requires named pipe support.")
+def test_lazyfile_does_not_open_fifo(tmp_path):
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+
+    with click.utils._LazyFile(fifo) as lf:
+        assert lf._f is None

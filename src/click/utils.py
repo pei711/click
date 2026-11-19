@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections.abc as cabc
 import os
 import re
+import stat
 import sys
 import typing as t
 from functools import update_wrapper
@@ -133,8 +134,10 @@ class _LazyFile:
             if "r" in mode:
                 # Open and close the file in case we're opening it for
                 # reading so that we can catch at least some errors in
-                # some cases early.
-                open(filename, mode).close()
+                # some cases early. A FIFO must not be opened here because
+                # opening it can consume data before the caller reads it.
+                if not stat.S_ISFIFO(os.stat(filename).st_mode):
+                    open(filename, mode).close()
             self._f = None
             self.should_close = True
 

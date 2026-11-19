@@ -1164,6 +1164,7 @@ def test_missing_envvar(runner):
     result = runner.invoke(cli)
     assert result.exit_code == 2
     assert "Error: Missing option '--foo'." in result.output
+
     cli = click.Command(
         "cli",
         params=[click.Option(["--foo"], envvar="bar", show_envvar=True, required=True)],
@@ -1178,6 +1179,17 @@ def test_missing_envvar(runner):
     result = runner.invoke(cli)
     assert result.exit_code == 2
     assert "Error: Missing option '--foo'." in result.output
+
+    result = runner.invoke(cli, auto_envvar_prefix="MYAPP")
+    assert result.exit_code == 2
+    assert "Error: Missing option '--foo' (env var: 'MYAPP_FOO')." in result.output
+
+    cli = click.Command(
+        "cli", params=[click.Option(["--foo"], type=int, show_envvar=True)]
+    )
+    result = runner.invoke(cli, ["--foo", "not-an-int"], auto_envvar_prefix="MYAPP")
+    assert result.exit_code == 2
+    assert "Error: Invalid value for '--foo' (env var: 'MYAPP_FOO')" in result.output
 
 
 @pytest.mark.parametrize(

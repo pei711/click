@@ -208,8 +208,7 @@ complete --no-files --command %(prog_name)s --arguments \
 # Compatible with Windows PowerShell 5.1+ and PowerShell (pwsh) 7+.
 # Uses Register-ArgumentCompleter -Native, which receives the command AST
 # as parsed by PowerShell. The command text is forwarded verbatim through
-# COMP_WORDS so the Python side can reuse the same shlex-based splitting
-# used by the bash/zsh completers.
+# COMP_WORDS and split using PowerShell's quoting and escaping rules.
 _SOURCE_POWERSHELL = """\
 Register-ArgumentCompleter -Native -CommandName %(prog_name)s -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
@@ -522,8 +521,13 @@ class PowerShellComplete(ShellComplete):
     name: t.ClassVar[str] = "powershell"
     source_template: t.ClassVar[str] = _SOURCE_POWERSHELL
 
+    def source_vars(self) -> _SourceVarsDict:
+        source_vars = super().source_vars()
+        source_vars["prog_name"] = "'" + self.prog_name.replace("'", "''") + "'"
+        return source_vars
+
     def get_completion_args(self) -> tuple[list[str], str]:
-        cwords = split_arg_string(os.environ["COMP_WORDS"])
+        cwords = _split_powershell_arg_string(os.environ["COMP_WORDS"])
         cword = int(os.environ["COMP_CWORD"])
         args = cwords[1:cword]
 
@@ -545,6 +549,63 @@ class PowerShellComplete(ShellComplete):
         else:
             help_ = "_"
         return f"{item.type}\n{item.value}\n{help_}"
+
+
+def _split_powershell_arg_string(string: str) -> list[str]:
+    """Split command text using PowerShell's quote and escape characters."""
+    words: list[str] = []
+    token: list[str] = []
+    quote: str | None = None
+    token_started = False
+    i = 0
+
+    while i < len(string):
+        char = string[i]
+
+        if quote == "'":
+            if char == "'":
+                if i + 1 < len(string) and string[i + 1] == "'":
+                    token.append("'")
+                    i += 2
+                    continue
+                quote = None
+            else:
+                token.append(char)
+        elif quote == '"':
+            if char == '"':
+                quote = None
+            elif char == "`" and i + 1 < len(string):
+                token.append(string[i + 1])
+                i += 2
+                continue
+            else:
+                token.append(char)
+        elif char.isspace():
+            if token_started:
+                words.append("".join(token))
+                token.clear()
+                token_started = False
+        elif char in ("'", '"'):
+            quote = char
+            token_started = True
+        elif char == "`" and i + 1 < len(string):
+            token.append(string[i + 1])
+            token_started = True
+            i += 2
+            continue
+        elif char == "`":
+            # Match split_arg_string's treatment of a trailing escape.
+            pass
+        else:
+            token.append(char)
+            token_started = True
+
+        i += 1
+
+    if token_started:
+        words.append("".join(token))
+
+    return words
 
 
 _available_shells: t.Final[dict[str, type[ShellComplete]]] = {

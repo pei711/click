@@ -365,6 +365,29 @@ def test_full_source_powershell(runner):
     assert "powershell_complete" in result.output
 
 
+def test_powershell_completion_args_preserve_windows_paths(monkeypatch):
+    pc = PowerShellComplete(Command("x"), {}, "x", "_X_COMPLETE")
+    monkeypatch.setenv("COMP_WORDS", r"x sub C:\Users\ann\doc")
+    monkeypatch.setenv("COMP_CWORD", "2")
+    assert pc.get_completion_args() == (["sub"], r"C:\Users\ann\doc")
+
+    monkeypatch.setenv("COMP_WORDS", 'x sub "C:\\Users\\Ann\\My Documents"')
+    assert pc.get_completion_args() == (["sub"], r"C:\Users\Ann\My Documents")
+
+    monkeypatch.setenv("COMP_WORDS", "x sub 'Ann''s C:\\docs'")
+    assert pc.get_completion_args() == (["sub"], "Ann's C:\\docs")
+
+    monkeypatch.setenv("COMP_WORDS", r"x sub C:\Users\Ann\My` Documents")
+    assert pc.get_completion_args() == (["sub"], r"C:\Users\Ann\My Documents")
+
+
+def test_powershell_completion_source_quotes_program_name():
+    pc = PowerShellComplete(Command("x"), {}, "my cli's.exe", "_X_COMPLETE")
+    source = pc.source()
+    assert "-CommandName 'my cli''s.exe'" in source
+    assert "& 'my cli''s.exe'" in source
+
+
 @pytest.mark.parametrize(
     ("shell", "env", "expect"),
     [
